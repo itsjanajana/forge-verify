@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+streamlit
+langgraph
+google-generativeai
+feedparser
+sentence-transformers
+requests
+python-dotenv
