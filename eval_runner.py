@@ -12,7 +12,6 @@ import sys
 import time
 
 from agent import verify
-from rollup import claim_label
 
 DELAY_SECONDS = 2  # stay under free-tier rate limits
 POSITIVE = {"supported", "partially_supported"}
@@ -27,7 +26,7 @@ def main(path):
         claim, expected = row["claim"].strip(), (row.get("expected") or "").strip()
         try:
             r = verify(claim)
-            got = claim_label(r["results"])["label"]
+            got = {"mixed": "partially_supported"}.get(r["overall"], r["overall"])
         except Exception as ex:
             got = f"error: {str(ex)[:60]}"
         ok = got == expected
