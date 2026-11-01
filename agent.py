@@ -4,40 +4,40 @@ from google import genai
 from google.genai import types
 from ingest import fetch_docs
 
-load_dotenv()
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY"),
-    http_options=types.HttpOptions(timeout=20000),
-)
+from groq import Groq
 
-MODELS = ["gemini-3.8-flash", "gemini-4-argon"]
+load_dotenv()
+
+gclient = Groq(api_key=os.getenv("GROQ_API_KEY"))
+MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
 
 def _ask(prompt, json_mode=False):
-    cfg = types.GenerateContentConfig(
-        response_mime_type="application/json" if json_mode else "text/plain"
-    )
-
     for attempt in range(2):
         for m in MODELS:
-
             try:
-                r = client.models.generate_content(model=m, contents=prompt, config=cfg)
-                return (r.text or "").strip()
+                r = gclient.chat.completions.create(
+                    model=m,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"} if json_mode else None,
+                )
+                return (r.choices[0].message.content or "").strip()
             except Exception as ex:
                 print(f"{m} failed:", str(ex)[:80])
     return None
 
 
+
 def decompose(claim, trace):
     out = _ask(f"""Split this claim into 1-3 atomic factual assertions.
-Return ONLY a JSON array of strings.
+Return ONLY JSON in this exact shape: {{"assertions": ["...", "..."]}}
 Claim: {claim}""", json_mode=True)
     try:
-        parts = json.loads(out or "[]")
+        parts = json.loads(out or "{}").get("assertions", [])
         if not isinstance(parts, list) or not parts:
             raise ValueError
     except Exception:
         parts = [claim]
+
     trace.append({"step": "decompose", "detail": f"{len(parts)} assertion(s)", "output": parts})
     return parts
 
