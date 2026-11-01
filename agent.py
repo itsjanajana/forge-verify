@@ -26,7 +26,6 @@ def _ask(prompt, json_mode=False):
     return None
 
 
-
 def decompose(claim, trace):
     out = _ask(f"""Split this claim into 1-3 atomic factual assertions.
 Return ONLY JSON in this exact shape: {{"assertions": ["...", "..."]}}
@@ -87,10 +86,24 @@ Sources:
     return v
 
 
+def overall(results):
+    """Roll per-assertion verdicts into one headline verdict."""
+    if not results:
+        return "insufficient_evidence"
+    kinds = [r["verdict"] for r in results]
+    if all(k == "supported" for k in kinds):
+        return "supported"
+    if all(k == "insufficient_evidence" for k in kinds):
+        return "insufficient_evidence"
+    if "contradicted" in kinds:
+        return "contradicted"
+    return "mixed"
+
+
 def verify(claim):
     trace = []
     if not claim or not claim.strip():
-        return {"claim": claim, "results": [],
+        return {"claim": claim, "results": [], "overall": "insufficient_evidence",
                 "trace": [{"step": "guardrail", "detail": "empty input", "output": "Please enter a claim."}]}
     docs = fetch_docs()
     trace.append({"step": "ingest", "detail": f"{len(docs)} live documents", "output": []})
@@ -98,7 +111,7 @@ def verify(claim):
     for a in decompose(claim, trace):
         hits = retrieve(a, docs, trace)
         results.append({"assertion": a, **verdict(a, hits, trace)})
-    return {"claim": claim, "results": results, "trace": trace}
+    return {"claim": claim, "results": results, "overall": overall(results), "trace": trace}
 
 if __name__ == "__main__":
     r = verify("The Cabinet approved Dearness Allowance for central government employees.")
