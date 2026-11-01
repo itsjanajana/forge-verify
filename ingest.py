@@ -1,34 +1,35 @@
 import feedparser
-import re
+import urllib.parse
 
 FEEDS = [
-    {"url": "https://news.google.com/rss/search?q=government+scheme+OR+notification+OR+policy+India&hl=en-IN&gl=IN&ceid=IN:en", "source": "Google News"},
-    {"url": "https://www.thehindu.com/news/national/feeder/default.rss", "source": "The Hindu"},
+    {"url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=1",
+     "source": "PIB", "tier": "Official"},
+    {"url": "https://www.thehindu.com/news/national/feeder/default.rss",
+     "source": "The Hindu", "tier": "Major outlet"},
+    {"url": "https://news.google.com/rss/search?q=government+scheme+OR+notification+OR+policy&hl=en-IN&gl=IN&ceid=IN:en",
+     "source": "Google News", "tier": "Aggregator"},
 ]
 
-def clean(text):
-    return re.sub(r"<[^>]+>", "", text or "").strip()
-
-def fetch_docs(limit=30):
+def fetch_docs(extra_query=None, limit=60):
+    feeds = list(FEEDS)
+    if extra_query:
+        q = urllib.parse.quote_plus(extra_query)
+        feeds.insert(0, {
+            "url": f"https://news.google.com/rss/search?q={q}&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "Google News (search)", "tier": "Aggregator",
+        })
     docs = []
-    for feed in FEEDS:
+    for f in feeds:
         try:
-            parsed = feedparser.parse(feed["url"])
-            for e in parsed.entries[:limit]:
+            parsed = feedparser.parse(f["url"])
+            for e in parsed.entries:
                 docs.append({
-                    "title": clean(e.get("title", "")),
-                    "summary": clean(e.get("summary", "")),
+                    "title": e.get("title", ""),
+                    "summary": e.get("summary", ""),
                     "link": e.get("link", ""),
-                    "published": e.get("published", ""),
-                    "source": feed["source"],
+                    "source": f["source"],
+                    "tier": f["tier"],
                 })
         except Exception as ex:
-            print("feed failed:", feed["source"], ex)
-    return docs
-
-if __name__ == "__main__":
-    docs = fetch_docs()
-    print(f"fetched {len(docs)} documents")
-    for d in docs[:5]:
-        print(f"- [{d['source']}] {d['title'][:80]}")
-
+            print(f"feed failed {f['source']}:", str(ex)[:80])
+    return docs[:limit]
